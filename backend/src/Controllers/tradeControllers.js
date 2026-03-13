@@ -76,3 +76,8 @@ const closeTrade = async(req,res)=>{
 }
 
 module.exports={getTrades,addTrades,closeTrade}
+
+
+
+
+
