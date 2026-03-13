@@ -3,28 +3,35 @@ const db =require('../dB_config/config');
 
 const addTrades = async(req,res)=>{
     try {
-        const{instrument,takeProfit,stopLoss,entry} = req.body;
+        const{instrument,takeProfit,stopLoss,entry,trade_type} = req.body;
+        const user_id = req.user.id;
+
+        console.log(req.user);
+        
         const entryP = parseFloat(entry);
         const sl = parseFloat(stopLoss);
         const tp = parseFloat(takeProfit);
+
+
 
         if (!instrument || !entryP || !sl || !tp) {
             return res.status(400).json({ message: "Missing required fields" });
         }
 
-        const risk= Math.abs(entryP-sl);
-        const reward = Math.abs(tp-entryP);
+        const risk= Math.abs(entryP-sl).toFixed(5);
+        const reward = Math.abs(tp-entryP).toFixed(5);
 
         const rrRatio = risk == 0 ? 0 : reward/risk;
-
-        const[result] = await db.query("INSERT INTO trades(instrument, entry_price, stop_loss, take_profit,risk,reward,rr_ratio) VALUES(?,?,?,?,?,?,?)",[instrument,takeProfit,stopLoss,entry,risk,reward,rrRatio]);
+        
+        const[result] = await db.query("INSERT INTO trades(instrument, entry_price, stop_loss, take_profit,risk,reward,rr_ratio,trade_type,user_id) VALUES(?,?,?,?,?,?,?,?,?)",[instrument,entry,stopLoss,takeProfit,risk,reward,rrRatio,trade_type,user_id]);
 
         res.json({
             id: result.insertId,
             message: "Trade added successfully",
             risk,
             reward,
-            rrRatio
+            rrRatio,
+            trade_type
         })
         
     } catch (error) {
@@ -35,7 +42,8 @@ const addTrades = async(req,res)=>{
 
 const getTrades = async(req,res)=>{
      try {
-        const [rows] = await db.query("SELECT * FROM trades");
+        const user_id = req.user.id
+        const [rows] = await db.query("SELECT * FROM trades WHERE user_id=?",[user_id]);
         res.json(rows);
     } catch (error) {
         console.error(error);
@@ -61,7 +69,15 @@ const closeTrade = async(req,res)=>{
         }
 
         const entry= parseFloat(trade.entry_price);
-        const pnl = Number((entry-exit).toFixed(5));
+        let pnl
+        if (trade.trade_type=='BUY') {
+            pnl=exit-entry;
+        }
+        else if (trade.trade_type=='SELL') {
+            pnl =entry-exit
+        }
+        
+        pnl = Number((pnl).toFixed(5));
 
         await db.query("UPDATE trades SET exit_price=?,pnl=?,status=? WHERE id=?",[exit,pnl,"closed",tradeId]);
 
